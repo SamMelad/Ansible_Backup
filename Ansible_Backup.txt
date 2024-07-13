@@ -1,0 +1,59 @@
+---
+- name: Ansible Archive
+  hosts: localhost
+  vars:
+    backup_directory: "/root/backups"
+    timestamp: "{{ ansible_date_time.year }}_{{ ansible_date_time.month }}__{{ ansible_date_time.day }}"
+    backup_path: "{{ backup_directory }}/Backup_{{ timestamp }}"
+
+  tasks:
+    - name: Create Backup Directory
+      ansible.builtin.file:
+        path: "{{ backup_path }}"
+        state: directory
+        mode: '0755'
+
+    - name: Compress 1st Directory
+      become: yes
+      ansible.builtin.archive:
+          path: "/root/test/d1/*"
+          dest: "{{ backup_path }}/Data_software.tar.gz"
+          format: gz
+
+    - name: Compress 2st Directory
+      become: yes
+      ansible.builtin.archive:
+          path: "/root/test/d2/*"
+          dest: "{{ backup_path }}/Data_util.tar.gz"
+          format: gz
+
+    - name: Compress 3st Directory
+      become: yes
+      ansible.builtin.archive:
+          path: "/root/test/d3/*"
+          dest: "{{ backup_path }}/Data_system-modules.tar.gz"
+          format: gz
+
+    - name: Find directories older than 7 days
+      ansible.builtin.find:
+        paths: "{{ backup_directory }}"
+        age: "7d"
+        recurse: yes
+        file_type: directory
+      register: old_dirs
+
+    - name: Remove old directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_dirs.files }}"
+      when: old_dirs.matched > 0
+      register: remove_result   
+      no_log: true
+
+      # To print removed directories in specific format 
+    - debug:
+        msg: "{{ item.item.path }}"
+      loop: "{{ remove_result.results }}"
+      loop_control:
+         label: "{{ item.item.path }}"
